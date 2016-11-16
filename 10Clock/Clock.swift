@@ -14,6 +14,8 @@ import UIKit
     @objc optional func timesUpdated(_ clock:TenClock, startDate:Date,  endDate:Date  ) -> ()
     //Executed after the user lifts their finger from the control.
     @objc optional func timesChanged(_ clock:TenClock, startDate:Date,  endDate:Date  ) -> ()
+    //Touch on region
+    @objc optional func touchOnTime(_ clock:TenClock, date:Date, time:String  ) -> ()
 }
 func medStepFunction(_ val: CGFloat, stepSize:CGFloat) -> CGFloat{
     let dStepSize = Double(stepSize)
@@ -110,6 +112,30 @@ open class TenClock : UIControl{
 
     open var headTextColor = UIColor.black
     open var tailTextColor = UIColor.black
+    
+    open var headText = "Wake"
+    open var tailText = "Sleep"
+    open var drawGradientLayer = true
+    open var drawTrackLayerPath = true
+    open var drawPathLayerPath = true
+    open var drawHeadTailLayers = true
+    open var drawWatchFaceTicks = true
+    open var drawWatchFaceNumerals = true
+    open var drawWatchFaceTitle = true
+    private var _clockType : Int = 12
+    open var clockType : Int {
+        get {
+            return _clockType
+        }
+        set(newValue) {
+            if newValue == 24 {
+                _clockType = newValue
+            }
+            else {
+                _clockType = 12
+            }
+        }
+    }
 
     open var minorTicksEnabled:Bool = true
     open var majorTicksEnabled:Bool = true
@@ -195,13 +221,13 @@ open class TenClock : UIControl{
         let components = self.calendar.dateComponents(units, from: date)
         let min = Double(  60 * components.hour! + components.minute! )
 
-        return medStepFunction(CGFloat(M_PI_2 - ( min / (12 * 60)) * 2 * M_PI), stepSize: CGFloat( 2 * M_PI / (12 * 60 / 5)))
+        return medStepFunction(CGFloat(M_PI_2 - ( min / (Double(clockType) * 60)) * 2 * M_PI), stepSize: CGFloat( 2 * M_PI / (Double(clockType) * 60 / 5)))
     }
 
     // input an angle, output: 0 to 4pi
     func angleToTime(_ angle: Angle) -> Date{
         let dAngle = Double(angle)
-        let min = CGFloat(((M_PI_2 - dAngle) / (2 * M_PI)) * (12 * 60))
+        let min = CGFloat(((M_PI_2 - dAngle) / (2 * M_PI)) * (Double(clockType) * 60))
         let startOfToday = Calendar.current.startOfDay(for: Date())
         return self.calendar.date(byAdding: .minute, value: Int(medStepFunction(min, stepSize: 5/* minute steps*/)), to: startOfToday)!
     }
@@ -230,13 +256,48 @@ open class TenClock : UIControl{
 
 
         CATransaction.setValue(kCFBooleanTrue, forKey: kCATransactionDisableActions)
-        updateGradientLayer()
-        updateTrackLayerPath()
-        updatePathLayerPath()
-        updateHeadTailLayers()
-        updateWatchFaceTicks()
-        updateWatchFaceNumerals()
-        updateWatchFaceTitle()
+        if (drawGradientLayer) {
+            updateGradientLayer()
+        }
+        else {
+            gradientLayer.colors = nil
+        }
+        
+        if (drawTrackLayerPath) {
+            updateTrackLayerPath()
+        }
+        else {
+            trackLayer.fillColor = nil
+        }
+        
+        if (drawPathLayerPath) {
+            updatePathLayerPath()
+        }
+        else {
+            pathLayer.fillColor = nil
+        }
+        
+        if (drawHeadTailLayers) {
+            updateHeadTailLayers()
+        }
+        else {
+            headLayer.fillColor = nil
+            tailLayer.fillColor = nil
+        }
+        
+        if (drawWatchFaceTicks) {
+            updateWatchFaceTicks()
+        }
+        
+        if (drawWatchFaceNumerals) {
+            updateWatchFaceNumerals()
+        }
+        
+        
+        if (drawWatchFaceTitle) {
+            updateWatchFaceTitle()
+        }
+        
         CATransaction.commit()
 
     }
@@ -315,8 +376,8 @@ open class TenClock : UIControl{
         topTailLayer.fillColor = disabledFormattedColor(tailBackgroundColor).cgColor
         topHeadLayer.sublayers?.forEach({$0.removeFromSuperlayer()})
         topTailLayer.sublayers?.forEach({$0.removeFromSuperlayer()})
-        let stText = tlabel("Sleep", color: disabledFormattedColor(headTextColor))
-        let endText = tlabel("Wake",color: disabledFormattedColor(tailTextColor))
+        let stText = tlabel(headText, color: disabledFormattedColor(headTextColor))
+        let endText = tlabel(tailText,color: disabledFormattedColor(tailTextColor))
         stText.position = topTailLayer.center
         endText.position = topHeadLayer.center
         topHeadLayer.addSublayer(endText)
@@ -330,8 +391,8 @@ open class TenClock : UIControl{
         let cgFont = CTFontCreateWithName(f.fontName as CFString?, f.pointSize/2,nil)
         let startPos = CGPoint(x: numeralsLayer.bounds.midX, y: 15)
         let origin = numeralsLayer.center
-        let step = (2 * M_PI) / 12
-        for i in (1 ... 12){
+        let step = (2 * M_PI) / Double(clockType)
+        for i in (1 ... clockType){
             let l = CATextLayer()
             l.bounds.size = CGSize(width: i > 9 ? 18 : 8, height: 15)
             l.fontSize = f.pointSize
@@ -357,8 +418,8 @@ open class TenClock : UIControl{
         titleTextLayer.font = cgFont
         //var computedTailAngle = tailAngle //+ (headAngle > tailAngle ? twoPi : 0)
         //computedTailAngle +=  (headAngle > computedTailAngle ? twoPi : 0)
-        let fiveMinIncrements = Int( ((tailAngle - headAngle) / twoPi) * 12 /*hrs*/ * 12 /*5min increments*/)
-        titleTextLayer.string = "\(fiveMinIncrements / 12)hr \((fiveMinIncrements % 12) * 5)min"
+        let fiveMinIncrements = Int( ((tailAngle - headAngle) / twoPi) * CGFloat(clockType) /*hrs*/ * 12 /*5min increments*/)
+        titleTextLayer.string = "\(fiveMinIncrements / clockType)hr \((fiveMinIncrements % clockType) * 5)min"
         titleTextLayer.position = gradientLayer.center
 
     }
@@ -392,7 +453,7 @@ open class TenClock : UIControl{
     }
     var pointerLength:CGFloat = 0.0
 
-    func createSublayers() {
+    open func createSublayers() {
         layer.addSublayer(repLayer2)
         layer.addSublayer(repLayer)
         layer.addSublayer(numeralsLayer)
@@ -414,7 +475,6 @@ open class TenClock : UIControl{
 //        self.addConstraint(NSLayoutConstraint(item: self, attribute: .Width, relatedBy: .Equal, toItem: self	, attribute: .Height, multiplier: 1, constant: 0))
        // tintColor = UIColor ( red: 0.755, green: 0.0, blue: 1.0, alpha: 1.0 )
         backgroundColor = UIColor ( red: 0.1149, green: 0.115, blue: 0.1149, alpha: 0.0 )
-        createSublayers()
     }
 
 
@@ -423,7 +483,6 @@ open class TenClock : UIControl{
 
         //tintColor = UIColor ( red: 0.755, green: 0.0, blue: 1.0, alpha: 1.0 )
         backgroundColor = UIColor ( red: 0.1149, green: 0.115, blue: 0.1149, alpha: 0.0 )
-        createSublayers()
     }
 
 
@@ -456,6 +515,7 @@ open class TenClock : UIControl{
 
     var pointMover:((CGPoint) ->())?
     override open func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        
         guard !disabled  else {
         		pointMover = nil
             return
@@ -500,6 +560,16 @@ open class TenClock : UIControl{
                     pointMover = nil
             }
         case pathLayer:
+            var angle : CGFloat = 0.0
+            pointerMoverProducer({ _ in angle}, { angle = $0 })(pointOfTouch)
+            let date = angleToTime(angle)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            let timeString = formatter.string(from: date)
+
+            self.delegate?.touchOnTime?(self, date: date, time: timeString)
+ 
+            /*
             if (shouldMoveHead) {
             		pointMover = pointerMoverProducer({ pt in
                 		let x = CGVector(from: self.bounds.center,
@@ -510,6 +580,8 @@ open class TenClock : UIControl{
             } else {
                     pointMover = nil
             }
+             */
+            break
         default: break
         }
 
